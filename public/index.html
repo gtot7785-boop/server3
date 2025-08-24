@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tower Wars - Multiplayer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(45deg, #1a1a2e, #16213e, #0f3460);
+            color: white;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        #canvas {
+            border: 2px solid #00ff88;
+            background: #0a0a0a;
+            cursor: crosshair;
+            display: block;
+            margin: 0 auto;
+        }
+
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .ui-element {
+            pointer-events: all;
+            position: absolute;
+        }
+
+        #connectionStatus {
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            border: 2px solid #4ecdc4;
+            font-size: 12px;
+        }
+
+        #topPanel {
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 2px solid #00ff88;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        #weaponPanel {
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #ff6b6b;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .weapon-slot {
+            width: 60px;
+            height: 60px;
+            border: 2px solid #444;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 12px;
+        }
+
+        .weapon-slot:hover {
+            border-color: #00ff88;
+            transform: scale(1.1);
+        }
+
+        .weapon-slot.selected {
+            border-color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.2);
+        }
+
+        .weapon-slot.cooldown {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #teamPanel {
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #4ecdc4;
+            min-width: 200px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .team-info {
+            margin-bottom: 10px;
+            padding: 5px;
+            border-radius: 5px;
+        }
+
+        .team-red { background: rgba(255, 107, 107, 0.3); }
+        .team-blue { background: rgba(107, 142, 255, 0.3); }
+        .team-green { background: rgba(107, 255, 142, 0.3); }
+        .team-yellow { background: rgba(255, 235, 107, 0.3); }
+
+        #connectionPanel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            border: 3px solid #00ff88;
+            text-align: center;
+            z-index: 100;
+            min-width: 400px;
+        }
+
+        #connectionPanel h2 {
+            color: #00ff88;
+            margin-bottom: 20px;
+        }
+
+        #playerNameInput {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 2px solid #444;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 16px;
+        }
+
+        #playerNameInput::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .team-select {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .team-btn {
+            padding: 15px;
+            border: 2px solid #444;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 16px;
+            position: relative;
+        }
+
+        .team-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .team-btn.selected {
+            transform: scale(1.1);
+        }
+
+        .team-btn.red { border-color: #ff6b6b; }
+        .team-btn.blue { border-color: #6b8eff; }
+        .team-btn.green { border-color: #6bff8e; }
+        .team-btn.yellow { border-color: #ffeb6b; }
+
+        .team-btn.red.selected { background: rgba(255, 107, 107, 0.3); }
+        .team-btn.blue.selected { background: rgba(107, 142, 255, 0.3); }
+        .team-btn.green.selected { background: rgba(107, 255, 142, 0.3); }
+        .team-btn.yellow.selected { background: rgba(255, 235, 107, 0.3); }
+
+        .team-count {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+
+        #startBtn, #joinBtn {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+
+        #startBtn:hover, #joinBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        #startBtn:disabled, #joinBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #chatPanel {
+            bottom: 20px;
+            right: 20px;
+            width: 300px;
+            height: 200px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #4ecdc4;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #chatMessages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            font-size: 12px;
+        }
+
+        #chatInput {
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 8px;
+            border-radius: 5px;
+            margin: 5px;
+        }
+
+        #chatInput::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .chat-message {
+            margin-bottom: 5px;
+            padding: 3px;
+            border-radius: 3px;
+        }
+
+        .chat-system {
+            color: #ffeb6b;
+            font-style: italic;
+        }
+
+        .chat-red { color: #ff6b6b; }
+        .chat-blue { color: #6b8eff; }
+        .chat-green { color: #6bff8e; }
+        .chat-yellow { color: #ffeb6b; }
+
+        .notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 107, 107, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 18px;
+            z-index: 200;
+            animation: fadeInOut 4s;
+        }
+
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; }
+            10%, 90% { opacity: 1; }
+        }
+
+        .health-bar {
+            width: 40px;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 2px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #4ecdc4;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="canvas" width="1100" height="700"></canvas>
+        
+        <div id="ui">
+            <div id="connectionStatus" class="ui-element">
+                <div class="loading"></div> Подключение...
+            </div>
+
+            <div id="topPanel" class="ui-element" style="display: none;">
+                <div>Раунд: <span id="round">1</span>/5</div>
+                <div>Время: <span id="timer">180</span>с</div>
+                <div>Ваши очки: <span id="playerScore">0</span></div>
+            </div>
+
+            <div id="weaponPanel" class="ui-element" style="display: none;">
+                <div class="weapon-slot selected" data-weapon="gravitygun" title="Гравипушка (КД: 30с)">
+                    <div>🔫</div>
+                    <div>30с</div>
+                </div>
+                <div class="weapon-slot" data-weapon="shield" title="Щит (КД: 15с)">
+                    <div>🛡️</div>
+                    <div>15с</div>
+                </div>
+                <div class="weapon-slot" data-weapon="speedboost" title="Ускорение (КД: 20с)">
+                    <div>⚡</div>
+                    <div>20с</div>
+                </div>
+                <div class="weapon-slot" data-weapon="teleport" title="Телепорт (КД: 45с)">
+                    <div>🌀</div>
+                    <div>45с</div>
+                </div>
+                <div class="weapon-slot" data-weapon="freeze" title="Заморозка (КД: 35с)">
+                    <div>❄️</div>
+                    <div>35с</div>
+                </div>
+                <div class="weapon-slot" data-weapon="laser" title="Лазер (КД: 25с)">
+                    <div>🔥</div>
+                    <div>25с</div>
+                </div>
+            </div>
+
+            <div id="teamPanel" class="ui-element" style="display: none;">
+                <h3>Команды</h3>
+                <div id="teamList"></div>
+                <div id="teamScores" style="margin-top: 15px;">
+                    <h4>Счет команд:</h4>
+                    <div id="scoreList"></div>
+                </div>
+            </div>
+
+            <div id="chatPanel" class="ui-element" style="display: none;">
+                <div id="chatMessages"></div>
+                <input id="chatInput" type="text" placeholder="Написать сообщение..." maxlength="100">
+            </div>
+        </div>
+
+        <div id="connectionPanel">
+            <h2>🏰 Tower Wars</h2>
+            <p>Многопользовательская башенная битва</p>
+            
+            <input id="playerNameInput" type="text" placeholder="Введите ваше имя" maxlength="20">
+            
+            <div class="team-select">
+                <button class="team-btn red" data-team="red">
+                    Красная команда
+                    <span class="team-count">0/4</span>
+                </button>
+                <button class="team-btn blue" data-team="blue">
+                    Синяя команда
+                    <span class="team-count">0/4</span>
+                </button>
+                <button class="team-btn green" data-team="green">
+                    Зеленая команда
+                    <span class="team-count">0/4</span>
+                </button>
+                <button class="team-btn yellow" data-team="yellow">
+                    Желтая команда
+                    <span class="team-count">0/4</span>
+                </button>
+            </div>
+            
+            <button id="joinBtn" disabled>Присоединиться к игре</button>
+            <button id="startBtn" style="display: none;">Начать игру</button>
+            
+            <div id="gameInstructions" style="margin-top: 20px; font-size: 14px; text-align: left;">
+                <h4>📋 Правила игры:</h4>
+                <ul style="list-style: none; padding-left: 0;">
+                    <li>🎯 Захватывайте вражеские башни</li>
+                    <li>🛡️ Защищайте свои башни</li>
+                    <li>⚔️ Используйте различное оружие</li>
+                    <li>🏆 5 раундов по 3 минуты</li>
+                    <li>🎮 Управление: WASD + клик мыши</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Подключение к серверу
+        const socket = io();
+        
+        // Элементы DOM
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const connectionPanel = document.getElementById('connectionPanel');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const playerNameInput = document.getElementById('playerNameInput');
+        const joinBtn = document.getElementById('joinBtn');
+        const startBtn = document.getElementById('startBtn');
+        const chatInput = document.getElementById('chatInput');
+        const chatMessages = document.getElementById('chatMessages');
+
+        // Игровое состояние
+        const clientState = {
+            connected: false,
+            gameStarted: false,
+            selectedTeam: null,
+            selectedWeapon: 'gravitygun',
+            playerId: null,
+            players: new Map(),
+            towers: new Map(),
+            effects: [],
+            keys: {},
+            myPlayer: null
+        };
+
+        // Цвета команд
+        const teamColors = {
+            red: '#ff6b6b',
+            blue: '#6b8eff', 
+            green: '#6bff8e',
+            yellow: '#ffeb6b'
+        };
+
+        // Конфигурация оружия
+        const weapons = {
+            gravitygun: { name: 'Гравипушка', cooldown: 30000 },
+            shield: { name: 'Щит', cooldown: 15000 },
+            speedboost: { name: 'Ускорение', cooldown: 20000 },
+            teleport: { name: 'Телепорт', cooldown: 45000 },
+            freeze: { name: 'Заморозка', cooldown: 35000 },
+            laser: { name: 'Лазер', cooldown: 25000 }
+        };
+
+        // Обработчики Socket.IO
+        socket.on('connect', () => {
+            clientState.connected = true;
+            connectionStatus.innerHTML = '🟢 Подключено к серверу';
+            console.log('Подключено к серверу');
+        });
+
+        socket.on('disconnect', () => {
+            clientState.connected = false;
+            connectionStatus.innerHTML = '🔴 Отключено от сервера';
+            console.log('Отключено от сервера');
+        });
+
+        socket.on('game_state', (state) => {
+            updateClientState(state);
+        });
+
+        socket.on('game_update', (state) => {
+            updateClientState(state);
+        });
+
+        socket.on('player_joined', (data) => {
+            clientState.playerId = data.playerId;
+            clientState.myPlayer = data.player;
+            
+            document.getElementById('topPanel').style.display = 'flex';
+            document.getElementById('weaponPanel').style.display = 'grid';
+            document.getElementById('teamPanel').style.display = 'block';
+            document.getElementById('chatPanel').style.display = 'flex';
+            
+            connectionPanel.style.display = 'none';
+            
+            addChatMessage(`Вы присоединились к команде ${data.team}`, 'system');
+        });
+
+        socket.on('player_connected', (data) => {
+            addChatMessage(`${data.player.name} присоединился к команде ${data.player.team}`, 'system');
+        });
+
+        socket.on('player_disconnected', (data) => {
+            const player = clientState.players.get(data.playerId);
+            if (player) {
+                addChatMessage(`${player.name} покинул игру`, 'system');
+            }
+        });
+
+        socket.on('game_started', (data) => {
+            clientState.gameStarted = true;
+            addChatMessage('🎮 Игра началась!', 'system');
+            startBtn.style.display = 'none';
+        });
+
+        socket.on('round_started', (data) => {
+            addChatMessage(`🔥 Раунд ${data.round} начался!`, 'system');
+        });
+
+        socket.on('round_ended', (data) => {
+            addChatMessage(data.message, 'system');
+            showNotification(`Раунд ${data.round} завершен!`);
+        });
+
+        socket.on('game_ended', (data) => {
+            addChatMessage(data.message, 'system');
+            showNotification(`Победила команда ${data.winner}!`);
+        });
+
+        socket.on('game_reset', () => {
+            addChatMessage('🔄 Игра сброшена. Ожидание новых игроков...', 'system');
+            connectionPanel.style.display = 'block';
+        });
+
+        socket.on('tower_captured', (data) => {
+            addChatMessage(data.message, 'system');
+            showNotification(`Башня захвачена командой ${data.newOwner}!`);
+        });
+
+        socket.on('weapon_used', (data) => {
+            // Визуальные эффекты от использования оружия другими игроками
+            if (data.weapon === 'laser') {
+                clientState.effects.push({
+                    type: 'laser',
+                    x1: data.playerX || 0,
+                    y1: data.playerY || 0,
+                    x2: data.targetX,
+                    y2: data.targetY,
+                    duration: 500,
+                    startTime: Date.now()
+                });
+            }
+        });
+
+        socket.on('chat_message', (data) => {
+            addChatMessage(`[${data.team}] ${data.playerName}: ${data.message}`, data.team);
+        });
+
+        socket.on('team_full', (data) => {
+            alert(`Команда ${data.team} переполнена! Выберите другую команду.`);
+        });
+
+        // Обновление состояния клиента
+        function updateClientState(state) {
+            // Обновление игроков
+            clientState.players.clear();
+            state.players.forEach(player => {
+                clientState.players.set(player.id, player);
+                if (player.id === clientState.playerId) {
+                    clientState.myPlayer = player;
+                    document.getElementById('playerScore').textContent = player.score;
+                }
+            });
+
+            // Обновление башен
+            clientState.towers.clear();
+            state.towers.forEach(tower => {
+                clientState.towers.set(tower.id, tower);
+            });
+
+            // Обновление игрового состояния
+            if (state.gameStarted !== clientState.gameStarted) {
+                clientState.gameStarted = state.gameStarted;
+            }
+
+            // Обновление UI
+            if (state.round) document.getElementById('round').textContent = state.round;
+            if (state.timer !== undefined) document.getElementById('timer').textContent = state.timer;
+
+            // Обновление счетчиков команд
+            updateTeamCounts(state.teamCounts);
+            updateTeamScores(state.teamScores);
+            updateTeamInfo();
+
+            // Обновление эффектов
+            if (state.effects) {
+                clientState.effects = state.effects;
+            }
+        }
+
+        // Обновление счетчиков команд
+        function updateTeamCounts(teamCounts) {
+            Object.entries(teamCounts).forEach(([team, count]) => {
+                const teamBtn = document.querySelector(`[data-team="${team}"]`);
+                if (teamBtn) {
+                    const countSpan = teamBtn.querySelector('.team-count');
+                    if (countSpan) {
+                        countSpan.textContent = `${count}/4`;
+                    }
+                }
+            });
+        }
+
+        // Обновление счета команд
+        function updateTeamScores(teamScores) {
+            const scoreList = document.getElementById('scoreList');
+            if (!scoreList) return;
+            
+            scoreList.innerHTML = '';
+            Object.entries(teamScores).forEach(([team, score]) => {
+                const div = document.createElement('div');
+                div.className = `team-${team}`;
+                div.innerHTML = `${team.toUpperCase()}: ${score}`;
+                scoreList.appendChild(div);
+            });
+        }
+
+        // Обновление информации о командах
+        function updateTeamInfo() {
+            const teamList = document.getElementById('teamList');
+            if (!teamList) return;
+            
+            teamList.innerHTML = '';
+
+            const teamStats = {
+                red: { players: [], towers: 0 },
+                blue: { players: [], towers: 0 },
+                green: { players: [], towers: 0 },
+                yellow: { players: [], towers: 0 }
+            };
+
+            // Подсчет игроков
+            for (let player of clientState.players.values()) {
+                teamStats[player.team].players.push(player);
+            }
+
+            // Подсчет башен
+            for (let tower of clientState.towers.values()) {
+                teamStats[tower.controlled].towers++;
+            }
+
+            // Отображение статистики
+            Object.entries(teamStats).forEach(([team, stats]) => {
+                const div = document.createElement('div');
+                div.className = `team-info team-${team}`;
+                div.innerHTML = `
+                    <strong>${team.toUpperCase()}</strong><br>
+                    Игроки: ${stats.players.length}<br>
+                    Башни: ${stats.towers}<br>
+                    ${stats.players.map(p => `• ${p.name} (${p.health}❤️)`).join('<br>')}
+                `;
+                teamList.appendChild(div);
+            });
+        }
+
+        // Обработчики событий
+        document.querySelectorAll('.team-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                clientState.selectedTeam = btn.dataset.team;
+                document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                
+                const playerName = playerNameInput.value.trim();
+                joinBtn.disabled = !playerName;
+            });
+        });
+
+        playerNameInput.addEventListener('input', () => {
+            const playerName = playerNameInput.value.trim();
+            joinBtn.disabled = !playerName || !clientState.selectedTeam;
+        });
+
+        joinBtn.addEventListener('click', () => {
+            const playerName = playerNameInput.value.trim();
+            if (playerName && clientState.selectedTeam) {
+                socket.emit('join_team', {
+                    team: clientState.selectedTeam,
+                    name: playerName
+                });
+            }
+        });
+
+        startBtn.addEventListener('click', () => {
+            socket.emit('start_game');
+        });
+
+        // Выбор оружия
+        document.querySelectorAll('.weapon-slot').forEach(slot => {
+            slot.addEventListener('click', () => {
+                if (!slot.classList.contains('cooldown')) {
+                    document.querySelectorAll('.weapon-slot').forEach(s => s.classList.remove('selected'));
+                    slot.classList.add('selected');
+                    clientState.selectedWeapon = slot.dataset.weapon;
+                }
+            });
+        });
+
+        // Использование оружия
+        canvas.addEventListener('click', (e) => {
+            if (!clientState.gameStarted || !clientState.myPlayer) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+            
+            socket.emit('use_weapon', {
+                weapon: clientState.selectedWeapon,
+                targetX: x,
+                targetY: y
+            });
+        });
+
+        // Управление движением
+        document.addEventListener('keydown', (e) => {
+            clientState.keys[e.key.toLowerCase()] = true;
+            updateMovement();
+        });
+
+        document.addEventListener('keyup', (e) => {
+            clientState.keys[e.key.toLowerCase()] = false;
+            updateMovement();
+        });
+
+        function updateMovement() {
+            if (!clientState.gameStarted || !clientState.myPlayer) return;
+            
+            let vx = 0, vy = 0;
+            
+            if (clientState.keys['w'] || clientState.keys['arrowup']) vy = -1;
+            if (clientState.keys['s'] || clientState.keys['arrowdown']) vy = 1;
+            if (clientState.keys['a'] || clientState.keys['arrowleft']) vx = -1;
+            if (clientState.keys['d'] || clientState.keys['arrowright']) vx = 1;
+            
+            if (vx !== 0 || vy !== 0) {
+                socket.emit('player_move', { vx, vy });
+            }
+        }
+
+        // Чат
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const message = e.target.value.trim();
+                if (message) {
+                    socket.emit('chat_message', { message });
+                    e.target.value = '';
+                }
+            }
+        });
+
+        function addChatMessage(message, type = 'system') {
+            const div = document.createElement('div');
+            div.className = `chat-message chat-${type}`;
+            
+            if (type === 'system') {
+                div.innerHTML = `<i>${message}</i>`;
+            } else {
+                div.textContent = message;
+            }
+            
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Ограничение количества сообщений
+            while (chatMessages.children.length > 50) {
+                chatMessages.removeChild(chatMessages.firstChild);
+            }
+        }
+
+        // Уведомления
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.textContent = message;
+            
+            if (type === 'success') {
+                notification.style.background = 'rgba(107, 255, 142, 0.9)';
+            } else if (type === 'warning') {
+                notification.style.background = 'rgba(255, 235, 107, 0.9)';
+            }
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 4000);
+        }
+
+        // Отрисовка игры
+        function gameLoop() {
+            // Очистка canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (!clientState.gameStarted && clientState.players.size === 0) {
+                // Экран ожидания
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.font = '24px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Ожидание игроков...', canvas.width / 2, canvas.height / 2);
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            // Рисование фона
+            drawGrid();
+
+            // Рисование башен
+            for (let tower of clientState.towers.values()) {
+                drawTower(tower);
+            }
+
+            // Рисование игроков
+            for (let player of clientState.players.values()) {
+                drawPlayer(player);
+            }
+
+            // Рисование эффектов
+            drawEffects();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            
+            const gridSize = 50;
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+
+        function drawPlayer(player) {
+            // Основной круг игрока
+            ctx.fillStyle = teamColors[player.team];
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Рамка
+            ctx.strokeStyle = player.id === clientState.playerId ? '#ffffff' : 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = player.id === clientState.playerId ? 3 : 2;
+            ctx.stroke();
+
+            // Полоска здоровья
+            const barWidth = 30;
+            const barHeight = 4;
+            const barX = player.x - barWidth / 2;
+            const barY = player.y - player.size - 10;
+
+            ctx.fillStyle = '#333';
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+
+            const healthPercent = player.health / player.maxHealth;
+            ctx.fillStyle = healthPercent > 0.5 ? '#4ecdc4' : '#ff6b6b';
+            ctx.fillRect(barX, barY, barWidth * healthPercent, barHeight);
+
+            // Имя игрока
+            ctx.fillStyle = 'white';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(player.name, player.x, player.y + player.size + 20);
+
+            // Эффекты на игроке
+            if (player.effects && player.effects.includes) {
+                if (player.effects.includes('shield')) {
+                    ctx.strokeStyle = '#00ff88';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(player.x, player.y, player.size + 5, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                if (player.effects.includes('freeze')) {
+                    ctx.fillStyle = 'rgba(173, 216, 230, 0.5)';
+                    ctx.beginPath();
+                    ctx.arc(player.x, player.y, player.size + 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                if (player.effects.includes('speed')) {
+                    ctx.strokeStyle = '#ffeb6b';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.arc(player.x, player.y, player.size + 8, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+        }
+
+        function drawTower(tower) {
+            // Основная башня
+            ctx.fillStyle = teamColors[tower.controlled];
+            ctx.fillRect(tower.x - tower.size/2, tower.y - tower.size/2, tower.size, tower.size);
+
+            // Рамка
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(tower.x - tower.size/2, tower.y - tower.size/2, tower.size, tower.size);
+
+            // Полоска здоровья
+            const barWidth = 50;
+            const barHeight = 6;
+            const barX = tower.x - barWidth / 2;
+            const barY = tower.y - tower.size/2 - 15;
+
+            ctx.fillStyle = '#333';
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+
+            const healthPercent = tower.health / tower.maxHealth;
+            ctx.fillStyle = healthPercent > 0.5 ? '#4ecdc4' : '#ff6b6b';
+            ctx.fillRect(barX, barY, barWidth * healthPercent, barHeight);
+
+            // Прогресс захвата
+            if (tower.captureProgress > 0) {
+                const captureY = barY - 10;
+                ctx.fillStyle = '#333';
+                ctx.fillRect(barX, captureY, barWidth, 4);
+                
+                ctx.fillStyle = '#ffeb6b';
+                ctx.fillRect(barX, captureY, barWidth * (tower.captureProgress / 100), 4);
+            }
+
+            // Индикатор команды
+            ctx.fillStyle = 'white';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(tower.controlled.toUpperCase(), tower.x, tower.y + 5);
+        }
+
+        function drawEffects() {
+            const now = Date.now();
+            
+            for (let i = clientState.effects.length - 1; i >= 0; i--) {
+                const effect = clientState.effects[i];
+                const elapsed = now - effect.startTime;
+                
+                if (elapsed > effect.duration) {
+                    clientState.effects.splice(i, 1);
+                    continue;
+                }
+                
+                if (effect.type === 'laser') {
+                    const opacity = 1 - (elapsed / effect.duration);
+                    ctx.strokeStyle = `rgba(255, 0, 0, ${opacity})`;
+                    ctx.lineWidth = 5;
+                    ctx.beginPath();
+                    ctx.moveTo(effect.x1, effect.y1);
+                    ctx.lineTo(effect.x2, effect.y2);
+                    ctx.stroke();
+                    
+                    // Частицы взрыва
+                    for (let j = 0; j < 5; j++) {
+                        const angle = (j / 5) * Math.PI * 2;
+                        const dist = (elapsed / effect.duration) * 30;
+                        const x = effect.x2 + Math.cos(angle) * dist;
+                        const y = effect.y2 + Math.sin(angle) * dist;
+                        
+                        ctx.fillStyle = `rgba(255, 100, 0, ${opacity})`;
+                        ctx.beginPath();
+                        ctx.arc(x, y, 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+
+        // Запуск игрового цикла
+        gameLoop();
+
+        // Отображение инструкций
+        addChatMessage('🏰 Добро пожаловать в Tower Wars!
